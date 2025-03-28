@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useRef, useState } from "react";
 import InputBox from "../components/input.component";
 import googleIcon from "../imgs/google.png";
 import AnimationWrapper from "../common/page-animation";
@@ -7,10 +6,18 @@ import AnimationWrapper from "../common/page-animation";
 const UserAuthForm = () => {
   const [type, setType] = useState("sign-in"); // Estado inicial como "sign-in"
 
+
+  const authForm = useRef()
+  const handleSubmit = (e) =>{
+    e.preventDefault()
+
+    let form = new FormData(authForm.current)
+  }
+
   return (
     <AnimationWrapper keyValue={type}>
       <section className="min-h-screen flex items-center justify-center px-6">
-        <form className="w-full max-w-[400px]">
+        <form ref={authForm} className="w-full max-w-[400px]">
           <h1 className="text-3xl md:text-4xl font-gelasio capitalize text-center mb-12 md:mb-24">
             {type === "sign-in" ? "Bem-Vindo de Volta" : "Aproveite a Poesia"}
           </h1>
@@ -41,6 +48,7 @@ const UserAuthForm = () => {
           <button
             className="btn-dark w-full mt-10 py-3 text-lg rounded-lg"
             type="submit"
+            onClick={handleSubmit}
           >
             {type === "sign-in" ? "Entrar" : "Cadastrar"}
           </button>
