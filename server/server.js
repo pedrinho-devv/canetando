@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import bcrypt from "bcrypt";
 import User from "./Schema/User.js";
 import { nanoid } from "nanoid";
+import jwt from "jsonwebtoken"
 
 dotenv.config();
 
@@ -37,6 +38,17 @@ mongoose
     process.exit(1); // Encerra o servidor se a conexão falhar
   });
 
+const formatDataSend = (user) => {
+  
+  const access_token = jwt.sign({id: user._id}, process.env.SECRET_ACCESS_KEY)
+  return {
+    access_token,
+    profile_img: user.personal_info.profile_img,
+    username: user.personal_info.username,
+    fullname: user.personal_info.fullname,
+  };
+};
+
 // Função para gerar o nome de usuário
 const generateUsername = async (email) => {
   let username = email.split("@")[0];
@@ -46,7 +58,7 @@ const generateUsername = async (email) => {
     "personal_info.username": username,
   });
   if (isUsernameNotUnique) {
-    username += nanoid(); // Gera um sufixo aleatório se o nome já existir
+    username += nanoid();
   }
   return username;
 };
@@ -92,7 +104,7 @@ server.post("/signup", async (req, res) => {
 
     // Salvando o usuário no banco de dados
     await user.save();
-    return res.status(200).json({ user });
+    return res.status(200).json(formatDataSend(user));
 
   } catch (err) {
     if (err.code === 11000) {
@@ -101,6 +113,24 @@ server.post("/signup", async (req, res) => {
     return res.status(500).json({ error: "Erro ao salvar o usuário: " + err.message });
   }
 });
+
+
+server.post("/signin", (req, res) =>{
+    let { email, password} =  req.body
+
+    User.findOne({"personal_info.email": email})
+    .then((user) =>{
+      if(!user){
+        return res.status(403).json({"error":"email não encontrado"})
+      }
+      console.log(user)
+      return res.json({"status": "got user document"})
+    })
+    .catch(err =>{
+      console.log(err)
+      return res.status(403).json({"error":"email não encontrado"})
+    })
+})
 
 // Inicia o servidor na porta definida
 server.listen(PORT, () => {
