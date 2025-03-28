@@ -1,87 +1,108 @@
 import express from "express";
 import mongoose from "mongoose";
-import "dotenv/config";
+import dotenv from "dotenv";
 import bcrypt from "bcrypt";
 import User from "./Schema/User.js";
 import { nanoid } from "nanoid";
 
+dotenv.config();
+
 const server = express();
-const PORT = process.env.PORT || 3000; // Permitir configuração via variável de ambiente
+const PORT = process.env.PORT || 3000;
 
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Regex mais simples e eficiente para validar e-mail
-const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/; // Senha deve ter pelo menos 8 caracteres, incluindo número, letra minúscula e maiúscula
+// Expressão regular para validação de email e senha
+let emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/; // regex para email
+let passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,20}$/; // regex para senha
 
-server.use(express.json()); // Middleware para JSON
+server.use(express.json());
 
-// Verifique se a variável de ambiente DB_LOCATION está definida
-console.log("🔗 String de conexão do MongoDB:", process.env.DB_LOCATION);
-
-// Conectar ao banco de dados de forma assíncrona
-mongoose
-  .connect(process.env.DB_LOCATION, { autoIndex: true })
-  .then(() => console.log("✅ Banco de Dados conectado"))
-  .catch((error) => console.error("❌ Erro ao conectar ao banco de dados:", error));
-
-const gerarUser = async (email) => {
-    let username = gerarUser
-
-    let usernameUnique = await User.exists({"personal_info.username": username}).then((result)=> result)
-
-    usernameUnique ? username += nanoid() : ""
-
-    return username
+// Verificando se a variável DB_LOCATION está definida
+if (!process.env.DB_LOCATION) {
+  console.error("A variável DB_LOCATION não está definida no .env");
+  process.exit(1);
 }
 
+// Conectando ao MongoDB
+mongoose
+  .connect(process.env.DB_LOCATION, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    autoIndex: true,
+    serverSelectionTimeoutMS: 5000, 
+    socketTimeoutMS: 45000
+  })
+  .then(() => console.log("Banco de dados conectado com sucesso!"))
+  .catch((err) => {
+    console.error("Erro ao conectar ao banco:", err.message);
+    process.exit(1); // Encerra o servidor se a conexão falhar
+  });
+
+// Função para gerar o nome de usuário
+const generateUsername = async (email) => {
+  let username = email.split("@")[0];
+
+  // Verifica se o nome de usuário já existe
+  let isUsernameNotUnique = await User.exists({
+    "personal_info.username": username,
+  });
+  if (isUsernameNotUnique) {
+    username += nanoid(); // Gera um sufixo aleatório se o nome já existir
+  }
+  return username;
+};
+
+// Rota de cadastro (signup)
 server.post("/signup", async (req, res) => {
+  let { fullname, email, password } = req.body;
+
+  // Verifica se fullname e email estão presentes
+  if (!fullname || fullname.length < 3) {
+    return res
+      .status(403)
+      .json({ error: "Fullname must be at least 3 letters long" });
+  }
+
+  if (!email || !email.length) {
+    return res.status(403).json({ error: "Entre com o E-mail" });
+  }
+
+  if (!emailRegex.test(email)) {
+    return res.status(403).json({ error: "Email inválido!" });
+  }
+
+  // Validação de senha
+  if (!passwordRegex.test(password)) {
+    return res.status(403).json({
+      error:
+        "Password should be 6 to 20 characters long with a numeric, 1 lowercase and 1 uppercase letter",
+    });
+  }
+
   try {
-    // Log dos dados recebidos no servidor
-    console.log("📥 Dados recebidos:", req.body);
-
-    const { nomeCompleto, email, password } = req.body;
-
-    // Validações
-    if (!nomeCompleto || nomeCompleto.trim().length < 3) {
-      return res.status(400).json({ error: "O nome deve ter pelo menos 3 caracteres." });
-    }
-
-    if (!email || !emailRegex.test(email.toLowerCase())) {
-      return res.status(400).json({ error: "E-mail inválido!" });
-    }
-
-    if (!password || !passwordRegex.test(password)) {
-      return res.status(400).json({
-        error: "A senha deve ter pelo menos 8 caracteres, incluindo número, letra minúscula e maiúscula.",
-      });
-    }
-
-    // Verificar se o e-mail já está cadastrado
-    const existingUser = await User.findOne({ "personal_info.email": email.toLowerCase() });
-    if (existingUser) {
-      return res.status(409).json({ error: "E-mail já cadastrado!" });
-    }
-
-    // Hash da senha
+    // Hash da senha com bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
-    const username = email.split("@")[0];
 
-    // Criar usuário
-    const newUser = new User({
-      personal_info: { name: nomeCompleto.trim(), email: email.toLowerCase(), password: hashedPassword, username },
+    // Gerar o nome de usuário
+    let username = await generateUsername(email);
+
+    // Criação do usuário
+    let user = new User({
+      personal_info: { fullname, email, password: hashedPassword, username },
     });
 
-    const savedUser = await newUser.save();
-    return res.status(201).json({ message: "Usuário cadastrado com sucesso!", user: savedUser });
+    // Salvando o usuário no banco de dados
+    await user.save();
+    return res.status(200).json({ user });
 
-  } catch (error) {
-    if(error.code ===  11000){
-        return res.status(500).json({"error": "Email já existe!"})
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(500).json({ error: "Email já existe." });
     }
-    console.error("❌ Erro ao criar usuário:", error);
-    return res.status(500).json({ error: "Erro interno no servidor. Tente novamente mais tarde." });
+    return res.status(500).json({ error: "Erro ao salvar o usuário: " + err.message });
   }
 });
 
-// Iniciar o servidor
+// Inicia o servidor na porta definida
 server.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log("Servidor ouvindo na porta " + PORT);
 });
