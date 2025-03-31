@@ -1,52 +1,62 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import InputBox from "../components/input.component";
 import googleIcon from "../imgs/google.png";
 import AnimationWrapper from "../common/page-animation";
 
 const UserAuthForm = () => {
   const [type, setType] = useState("sign-in");
-  const authForm = useRef(null); 
+  const authForm = useRef(null); // Inicializa corretamente com null
+
+  // Para garantir que a referência do formulário seja acessada corretamente após o componente ser montado
+  useEffect(() => {
+    console.log("Formulário montado:", authForm.current);
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    console.log("Referência do formulário:", authForm.current);
 
     if (!authForm.current) {
       console.error("Erro: O formulário não foi encontrado.");
       return;
     }
 
-    let form = new FormData(authForm.current);
+    const form = new FormData(authForm.current);
     let formData = {};
 
     for (let [key, value] of form.entries()) {
       formData[key] = value;
     }
 
-    let { fullName, email, password } = formData; // Corrigindo os nomes dos campos
+    let { email, password, fullName } = formData;
 
     // Expressões regulares para validação
-    let emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
-    let passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,20}$/;
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,20}$/;
 
     // Validação do Nome Completo (apenas no signup)
-    if (type === "signup" && (!fullName || fullName.length < 3)) {
-      return console.error("Erro: O nome completo deve ter pelo menos 3 caracteres.");
+    if (type === "signup" && (!fullName || fullName.trim().length < 3)) {
+      console.error("Erro: O nome completo deve ter pelo menos 3 caracteres.");
+      return;
     }
 
     // Validação de Email
-    if (!email || !email.length) {
-      return console.error("Erro: O campo de e-mail é obrigatório.");
+    if (!email || !email.trim().length) {
+      console.error("Erro: O campo de e-mail é obrigatório.");
+      return;
     }
 
     if (!emailRegex.test(email)) {
-      return console.error("Erro: E-mail inválido!");
+      console.error("Erro: E-mail inválido!");
+      return;
     }
 
     // Validação de Senha
     if (!passwordRegex.test(password)) {
-      return console.error(
+      console.error(
         "Erro: A senha deve ter entre 6 a 20 caracteres, incluindo pelo menos um número, uma letra minúscula e uma maiúscula."
       );
+      return;
     }
 
     console.log("Formulário válido:", formData);
@@ -55,7 +65,8 @@ const UserAuthForm = () => {
   return (
     <AnimationWrapper keyValue={type}>
       <section className="min-h-screen flex items-center justify-center px-6">
-        <form ref={authForm} className="w-full max-w-[400px]" onSubmit={handleSubmit}>
+        {/* Adicionado "noValidate" para evitar a validação automática do HTML */}
+        <form ref={authForm} className="w-full max-w-[400px]" onSubmit={handleSubmit} noValidate>
           <h1 className="text-3xl md:text-4xl font-gelasio capitalize text-center mb-12 md:mb-24">
             {type === "sign-in" ? "Bem-Vindo de Volta" : "Aproveite a Poesia"}
           </h1>
@@ -86,20 +97,26 @@ const UserAuthForm = () => {
             {type === "sign-in" ? (
               <>
                 Ainda não possui uma conta?{" "}
-                <button className="underline text-black" onClick={(e) => {
-                  e.preventDefault();
-                  setType("signup");
-                }}>
+                <button
+                  className="underline text-black"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setType("signup");
+                  }}
+                >
                   Aproveite conosco
                 </button>
               </>
             ) : (
               <>
                 Já possui uma conta?{" "}
-                <button className="underline text-black" onClick={(e) => {
-                  e.preventDefault();
-                  setType("sign-in");
-                }}>
+                <button
+                  className="underline text-black"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setType("sign-in");
+                  }}
+                >
                   Sign In Aqui.
                 </button>
               </>
