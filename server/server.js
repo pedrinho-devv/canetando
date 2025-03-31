@@ -123,12 +123,22 @@ server.post("/signin", (req, res) =>{
       if(!user){
         return res.status(403).json({"error":"email não encontrado"})
       }
-      console.log(user)
-      return res.json({"status": "got user document"})
+
+      bcrypt.compare(password, user.personal_info.password, (err, result) =>{
+          if(err){
+            return res.status(403).json({"error": "erro ocorreu enquando logava. tente de novo!"})
+          }
+          if(!result){
+            return res.status(403).json({"error": "Senha incorreta!"})
+          }else{
+            return res.status(200),json(formatDataSend(user))
+          }
+      })
+
     })
     .catch(err =>{
-      console.log(err)
-      return res.status(403).json({"error":"email não encontrado"})
+      console.log(err.message)
+      return res.status(500).json({"error":err.message})
     })
 })
 
